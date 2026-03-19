@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = 'http://localhost:5000';
 
 export interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
   createdAt: string;
@@ -56,13 +56,13 @@ export const authService = {
   async signup(data: SignupData): Promise<AuthResponse> {
     try {
       const response = await api.post<ApiResponse<AuthResponse>>('/api/auth/signup', data);
-      
+
       if (response.data.success && response.data.data) {
         // Store token
         localStorage.setItem('token', response.data.data.token);
         return response.data.data;
       }
-      
+
       throw new Error(response.data.message || 'Signup failed');
     } catch (error: any) {
       if (error.response?.data) {
@@ -79,13 +79,13 @@ export const authService = {
   async login(data: LoginData): Promise<AuthResponse> {
     try {
       const response = await api.post<ApiResponse<AuthResponse>>('/api/auth/login', data);
-      
+
       if (response.data.success && response.data.data) {
         // Store token
         localStorage.setItem('token', response.data.data.token);
         return response.data.data;
       }
-      
+
       throw new Error(response.data.message || 'Login failed');
     } catch (error: any) {
       if (error.response?.data) {
@@ -102,11 +102,11 @@ export const authService = {
   async getCurrentUser(): Promise<User> {
     try {
       const response = await api.get<ApiResponse<{ user: User }>>('/api/auth/me');
-      
+
       if (response.data.success && response.data.data) {
         return response.data.data.user;
       }
-      
+
       throw new Error(response.data.message || 'Failed to get user');
     } catch (error: any) {
       if (error.response?.data) {

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const chatRequestSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty'),
-  selectedLLM: z.string().optional(),
+  provider: z.enum(['openai', 'google', 'anthropic', 'groq']),
+  model: z.string().min(1, 'Model must be selected'),
 });
 
 export type ChatRequestDto = z.infer<typeof chatRequestSchema>;

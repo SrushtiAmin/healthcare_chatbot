@@ -7,5 +7,6 @@ const router = Router();
 // POST /api/chat -> call controller
 // Protect route with Auth middleware
 router.post('/', authenticateToken, ChatController.handleChat);
+router.get('/history', authenticateToken, ChatController.handleGetHistory);
 
 export default router;
