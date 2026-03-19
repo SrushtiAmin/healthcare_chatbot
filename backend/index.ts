@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { authRoutes } from './src/modules/auth';
+import chatRoutes from './src/modules/chat/chat.route';
 
 dotenv.config();
 
@@ -24,6 +25,9 @@ app.get('/api/health', (req, res) => {
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+
+// Chat routes
+app.use('/api/chat', chatRoutes);
 
 // Start server
 app.listen(PORT, () => {

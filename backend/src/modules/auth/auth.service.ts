@@ -1,10 +1,38 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import path from 'path';
 import { User, UserWithoutPassword, AuthResponse } from './auth.types';
 import { SignupInput, LoginInput } from './auth.schema';
 
-// In-memory user storage (replace with database in production)
-const users: User[] = [];
+// Local file JSON store
+const USERS_FILE_PATH = path.join(__dirname, '../../../data/users.json');
+
+const initializeUsers = (): User[] => {
+  const dir = path.dirname(USERS_FILE_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (!fs.existsSync(USERS_FILE_PATH)) {
+    fs.writeFileSync(USERS_FILE_PATH, '[]');
+  }
+  try {
+    const data = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(data || '[]');
+    return parsed.map((user: any) => ({
+      ...user,
+      createdAt: new Date(user.createdAt),
+    }));
+  } catch (err) {
+    return [];
+  }
+};
+
+const saveUsers = (usersToSave: User[]) => {
+  fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(usersToSave, null, 2));
+};
+
+let users: User[] = initializeUsers();
 
 export class AuthService {
   private static generateId(): string {
@@ -30,6 +58,9 @@ export class AuthService {
   }
 
   static async signup(signupData: SignupInput): Promise<AuthResponse> {
+    // Reload users just in case it was modified by another request
+    users = initializeUsers();
+
     // Check if user already exists
     const existingUser = users.find(user => user.email === signupData.email);
     if (existingUser) {
@@ -49,8 +80,9 @@ export class AuthService {
       createdAt: new Date(),
     };
 
-    // Store user (in memory for now)
+    // Store user globally and in file
     users.push(newUser);
+    saveUsers(users);
 
     // Generate token and return response
     const userWithoutPassword = this.excludePassword(newUser);
@@ -63,6 +95,9 @@ export class AuthService {
   }
 
   static async login(loginData: LoginInput): Promise<AuthResponse> {
+    // Reload users
+    users = initializeUsers();
+
     // Find user by email
     const user = users.find(u => u.email === loginData.email);
     if (!user) {
@@ -86,6 +121,7 @@ export class AuthService {
   }
 
   static async getUserById(id: string): Promise<UserWithoutPassword | null> {
+    users = initializeUsers();
     const user = users.find(u => u.id === id);
     if (!user) {
       return null;
@@ -96,6 +132,7 @@ export class AuthService {
 
   // Helper method for testing (remove in production)
   static getUsers(): UserWithoutPassword[] {
+    users = initializeUsers();
     return users.map(user => this.excludePassword(user));
   }
 }
