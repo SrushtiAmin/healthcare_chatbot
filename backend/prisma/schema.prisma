@@ -10,7 +10,7 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   name      String
   email     String   @unique
   password  String
@@ -19,13 +19,16 @@ model User {
 }
 
 model Chat {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(uuid())
+  userId    String
   message   String
   response  String
   type      String // general | symptom | medicine | document
   provider  String
   model     String
+  source    String   @default("llm") // "llm"
+  context   String? // Optional function or RAG data
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
 }

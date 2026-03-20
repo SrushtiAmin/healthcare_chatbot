@@ -2,7 +2,7 @@ import { Request } from 'express';
 import jwt from 'jsonwebtoken';
 
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   password: string;
@@ -10,7 +10,7 @@ export interface User {
 }
 
 export interface UserWithoutPassword {
-  id: number;
+  id: string;
   name: string;
   email: string;
   createdAt: Date;
@@ -22,7 +22,7 @@ export interface AuthResponse {
 }
 
 export interface JwtPayload {
-  id: number;
+  id: string;
   email: string;
   iat?: number;
   exp?: number;

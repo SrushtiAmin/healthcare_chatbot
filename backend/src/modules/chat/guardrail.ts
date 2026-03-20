@@ -13,8 +13,9 @@ export class GuardrailService {
         try {
             // For guardrail, we use a lightweight model by default (e.g., Llama 3 8B on Groq or Gemini Flash)
             // If no API keys, we fall back to a simple keyword check
-            const prompt = `You are a healthcare guardrail. Determine if the following user query is related to health, medicine, symptoms, or medical documents. 
-      Respond with strictly 'YES' if it is related, or 'NO' followed by a brief reason if it is NOT.
+            const prompt = `You are a healthcare assistant guardrail. 
+      Determine if the following user query is related to healthcare (symptoms, medicine, documents) OR is a greeting/introductory message (like 'Hi', 'Hello', 'Who are you?').
+      Respond with strictly 'YES' if it is related or a valid greeting, or 'NO' followed by a brief reason if it is clearly unrelated to healthcare or your role as an assistant.
       Query: "${message}"`;
 
             let response = '';
@@ -55,7 +56,8 @@ export class GuardrailService {
     private static keywordCheck(message: string): GuardrailResult {
         const healthcareKeywords = [
             'health', 'medicine', 'symptom', 'pain', 'doctor', 'pill', 'dose', 'fever',
-            'medical', 'report', 'lab', 'test', 'blood', 'heart', 'headache', 'prescription'
+            'medical', 'report', 'lab', 'test', 'blood', 'heart', 'headache', 'prescription',
+            'hi', 'hello', 'hey', 'greetings', 'help', 'who'
         ];
         const lowerMessage = message.toLowerCase();
         const isAllowed = healthcareKeywords.some(kw => lowerMessage.includes(kw));

@@ -1,7 +1,7 @@
 import { LLMProvider } from './llm.service';
 
 export interface ChatRequest {
-  userId: number;
+  userId: string;
   message: string;
   provider: LLMProvider;
   model: string;

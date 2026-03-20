@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { chatService, ChatResponseData } from '../../services/chat.service';
 import { useAuth } from '../../contexts/AuthContext';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -17,12 +18,12 @@ interface ChatInterfaceProps {
 }
 
 const LLM_OPTIONS = [
+  { provider: 'groq', model: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Groq)', icon: '🏎️' },
   { provider: 'google', model: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Fast)', icon: '⚡' },
   { provider: 'google', model: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Brainy)', icon: '🧠' },
   { provider: 'openai', model: 'gpt-4o', label: 'GPT-4o', icon: '🤖' },
   { provider: 'openai', model: 'gpt-4o-mini', label: 'GPT-4o Mini', icon: '🔋' },
   { provider: 'anthropic', model: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet', icon: '🎭' },
-  { provider: 'groq', model: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Groq)', icon: '🏎️' },
 ];
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
@@ -110,6 +111,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
         sender: 'bot',
         timestamp: new Date(),
         type: response.type,
+        provider: selectedLLM.provider,
+        model: selectedLLM.model,
       };
 
       setMessages((prev) => [...prev, botMessage]);
@@ -123,10 +126,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
       };
       setMessages((prev) => [...prev, errorMessage]);
 
-      // If it's a guardrail block, we might want to alert specifically
-      if (error.message.includes('restricted toward healthcare')) {
-        alert("Restricted: Please only ask healthcare-related questions.");
-      }
+      // If it's a guardrail block, the error message is already shown in the chat
     } finally {
       setIsLoading(false);
     }
@@ -198,16 +198,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
               className={`max-w-[85%] md:max-w-[80%] rounded-2xl p-4.5 shadow-sm border
                 ${msg.sender === 'user'
                   ? 'bg-blue-600 text-white rounded-br-sm border-blue-500 shadow-blue-100'
-                  : `${getTypeColor(msg.type)} rounded-bl-sm`
+                  : `${getTypeColor(msg.type)} rounded-bl-sm prose prose-slate max-w-none`
                 }
               `}
             >
-              <p className="whitespace-pre-wrap leading-relaxed text-[15px] font-medium">{msg.text}</p>
+              {msg.sender === 'bot' ? (
+                <div className="leading-relaxed text-[15px] font-medium bot-markdown-container">
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap leading-relaxed text-[15px] font-medium">{msg.text}</p>
+              )}
 
               {msg.sender === 'bot' && msg.type && msg.type !== 'general' && (
                 <div className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-70 border-t border-black/5 pt-2">
                   <span className={`w-1.5 h-1.5 rounded-full ${msg.type === 'blocked' ? 'bg-red-500' : 'bg-blue-500'}`}></span>
                   Type: {msg.type}
+                  {msg.provider && msg.model && (
+                    <span className="ml-auto opacity-60">LLM: {msg.provider.toUpperCase()} / {msg.model.split('-').slice(0, 2).join('-')}</span>
+                  )}
                 </div>
               )}
             </div>

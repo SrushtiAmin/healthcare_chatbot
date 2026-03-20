@@ -82,7 +82,7 @@ export class AuthService {
     };
   }
 
-  static async getUserById(id: number): Promise<UserWithoutPassword | null> {
+  static async getUserById(id: string): Promise<UserWithoutPassword | null> {
     const user = await prisma.user.findUnique({
       where: { id },
     });
