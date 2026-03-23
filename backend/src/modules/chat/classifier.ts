@@ -25,7 +25,7 @@ export class ClassifierService {
                     message: prompt,
                     provider: 'groq',
                     model: process.env.CLASSIFIER_MODEL || 'llama-3.3-70b-versatile',
-                });
+                });                                                                                                             
             } else if (process.env.GEMINI_API_KEY) {
                 response = await LLMService.generateResponse({
                     message: prompt,
