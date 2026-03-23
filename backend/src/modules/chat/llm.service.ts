@@ -12,7 +12,31 @@ export interface LLMRequest {
 }
 
 export class LLMService {
-    private static readonly SYSTEM_PROMPT = "You are a healthcare assistant. Only answer healthcare-related queries.";
+    /**
+     * Medical Fine-Tuned System Prompt
+     * This instructs the LLM to behave with clinical precision, evidence-based reasoning, 
+     * and strict medical boundary enforcement.
+     */
+    private static readonly SYSTEM_PROMPT = `
+You are a highly specialized AI Healthcare Assistant named "Vaidya AI". 
+Your core directive is to provide precise, evidence-based, and clinically sound information.
+
+CONSTRAINTS & TUNING:
+1. ONLY answer healthcare-related queries (symptoms, medications, lab reports, wellness).
+2. For document analysis: Strictly use the provided context. If the data is ambiguous, state the ambiguity.
+3. Clinical Precision: Use professional medical terminology but explain it simply for the patient.
+4. Boundaries: Do NOT provide life-or-death emergency advice. Always advise consulting a physical doctor for critical issues.
+5. Factual Accuracy: Prioritize accuracy over creativity. If you don't know, say you don't know.
+6. Conciseness: Give structured, easy-to-read responses using markdown (bullet points, bold text).
+
+Current User Consultation Context below:
+`.trim();
+
+    /**
+     * Low temperature (0.1) is used across all providers to ensure 
+     * high factual consistency and minimal creative hallucination.
+     */
+    private static readonly DEFAULT_TEMPERATURE = 0.1;
 
     public static async generateResponse(request: LLMRequest): Promise<string> {
         const { message, provider, model } = request;
@@ -43,6 +67,7 @@ export class LLMService {
         const openai = new OpenAI({ apiKey });
         const response = await openai.chat.completions.create({
             model: model || process.env.OPENAI_MODEL || 'gpt-4o',
+            temperature: this.DEFAULT_TEMPERATURE,
             messages: [
                 { role: 'system', content: this.SYSTEM_PROMPT },
                 { role: 'user', content: message },
@@ -62,7 +87,13 @@ export class LLMService {
             systemInstruction: this.SYSTEM_PROMPT
         });
 
-        const result = await geminiModel.generateContent(message);
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: message }] }],
+            generationConfig: {
+                temperature: this.DEFAULT_TEMPERATURE,
+                topP: 0.9,
+            }
+        });
         const response = await result.response;
         return response.text();
     }
@@ -75,6 +106,7 @@ export class LLMService {
         const response = await anthropic.messages.create({
             model: model || process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620',
             max_tokens: 1024,
+            temperature: this.DEFAULT_TEMPERATURE,
             system: this.SYSTEM_PROMPT,
             messages: [{ role: 'user', content: message }],
         });
@@ -92,7 +124,8 @@ export class LLMService {
 
         const groq = new Groq({ apiKey });
         const response = await groq.chat.completions.create({
-            model: model || process.env.GROQ_MODEL || 'llama3-8b-8192',
+            model: model || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            temperature: this.DEFAULT_TEMPERATURE,
             messages: [
                 { role: 'system', content: this.SYSTEM_PROMPT },
                 { role: 'user', content: message },

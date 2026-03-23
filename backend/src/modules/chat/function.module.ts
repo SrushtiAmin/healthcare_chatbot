@@ -50,22 +50,4 @@ export class FunctionModule {
             return "Unable to retrieve pharmacology context. Advise consulting a professional.";
         }
     }
-
-    /**
-     * Simulates document-based context extraction (Future hook for RAG).
-     */
-    public static async getDocumentContext(message: string): Promise<string> {
-        const prompt = `Extract medical document reference data relevant to: "${message}". 
-      Summarize common document metadata or patient history points that would be relevant.`;
-
-        try {
-            return await LLMService.generateResponse({
-                message: prompt,
-                provider: 'groq',
-                model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-            });
-        } catch (error) {
-            return "Unable to retrieve document context.";
-        }
-    }
 }

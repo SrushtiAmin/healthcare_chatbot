@@ -10,16 +10,30 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   name      String
-  email     String   @unique
+  email     String        @unique
   password  String
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+  sessions  ChatSession[]
   chats     Chat[]
+  files     File[]
+}
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  title     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  chats     Chat[]
+  files     File[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Chat {
   id        String   @id @default(uuid())
+  sessionId String?
   userId    String
   message   String
   response  String
@@ -30,5 +44,31 @@ model Chat {
   context   String? // Optional function or RAG data
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  session ChatSession? @relation(fields: [sessionId], references: [id])
+}
+
+model File {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  type      String // pdf | image
+  userId    String
+  sessionId String?
+  createdAt DateTime @default(now())
+  chunks    Chunk[]
+
+  user    User         @relation(fields: [userId], references: [id])
+  session ChatSession? @relation(fields: [sessionId], references: [id])
+}
+
+model Chunk {
+  id        String   @id @default(uuid())
+  content   String
+  fileId    String
+  userId    String
+  vectorId  Int // Reference to the index in FAISS
+  createdAt DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 }

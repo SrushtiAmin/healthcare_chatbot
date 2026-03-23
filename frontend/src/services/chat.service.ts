@@ -4,11 +4,13 @@ export interface ChatRequest {
   message: string;
   provider: string;
   model: string;
+  sessionId?: string;
 }
 
 export interface ChatResponseData {
   responseText: string;
   type: 'general' | 'symptom' | 'medicine' | 'document' | 'blocked';
+  sessionId: string;
 }
 
 export interface ChatApiResponse {
@@ -26,12 +28,47 @@ export const chatService = {
         return response.data.data;
       }
 
+      // If it's a blocked message, we still get session info but it might be in an error response
       throw new Error(response.data.message || 'Failed to send message');
     } catch (error: any) {
       if (error.response?.data) {
+        // Handle blocked case where data contains sessionId
+        if (error.response.data.data && error.response.data.data.sessionId) {
+          throw {
+            message: error.response.data.message,
+            sessionId: error.response.data.data.sessionId,
+            type: 'blocked'
+          };
+        }
         throw new Error(error.response.data.message || 'Failed to send message');
       }
       throw error;
+    }
+  },
+
+  async getSessions(): Promise<any[]> {
+    try {
+      const response = await api.get<any>('/api/chat/sessions');
+      if (response.data.success) {
+        return response.data.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Sessions fetch error:', error);
+      return [];
+    }
+  },
+
+  async getMessages(sessionId: string): Promise<any[]> {
+    try {
+      const response = await api.get<any>(`/api/chat/sessions/${sessionId}/messages`);
+      if (response.data.success) {
+        return response.data.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Messages fetch error:', error);
+      return [];
     }
   },
 

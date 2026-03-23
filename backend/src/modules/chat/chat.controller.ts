@@ -27,6 +27,7 @@ export class ChatController {
         message: validatedData.message,
         provider: validatedData.provider,
         model: validatedData.model,
+        sessionId: validatedData.sessionId, // PASS SESSION ID
       };
 
       // 4. Call service logic
@@ -37,7 +38,8 @@ export class ChatController {
         res.status(403).json({
           success: false,
           message: chatResponse.responseText,
-          reason: chatResponse.reason
+          reason: chatResponse.reason,
+          data: chatResponse, // Include sessionId even if blocked
         });
         return;
       }
@@ -49,6 +51,56 @@ export class ChatController {
       });
     } catch (error) {
       handleApiError(error, res, 'ChatController.handleChat');
+    }
+  }
+
+  /**
+   * Fetch all chat sessions for the logged-in user.
+   */
+  public static async handleGetSessions(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ success: false, message: 'User authentication context is missing.' });
+        return;
+      }
+
+      const sessions = await ChatService.getSessions(user.id);
+
+      res.status(200).json({
+        success: true,
+        data: sessions,
+      });
+    } catch (error) {
+      handleApiError(error, res, 'ChatController.handleGetSessions');
+    }
+  }
+
+  /**
+   * Fetch all messages for a specific session.
+   */
+  public static async handleGetSessionMessages(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ success: false, message: 'User authentication context is missing.' });
+        return;
+      }
+
+      const { sessionId } = req.params;
+      if (!sessionId) {
+        res.status(400).json({ success: false, message: 'Session ID is required.' });
+        return;
+      }
+
+      const messages = await ChatService.getSessionMessages(sessionId as string, user.id);
+
+      res.status(200).json({
+        success: true,
+        data: messages,
+      });
+    } catch (error) {
+      handleApiError(error, res, 'ChatController.handleGetSessionMessages');
     }
   }
 

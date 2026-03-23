@@ -8,5 +8,7 @@ const router = Router();
 // Protect route with Auth middleware
 router.post('/', authenticateToken, ChatController.handleChat);
 router.get('/history', authenticateToken, ChatController.handleGetHistory);
+router.get('/sessions', authenticateToken, ChatController.handleGetSessions);
+router.get('/sessions/:sessionId/messages', authenticateToken, ChatController.handleGetSessionMessages);
 
 export default router;

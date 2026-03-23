@@ -14,7 +14,8 @@
   margin-bottom: 0;
 }
 
-.bot-markdown-container ul, .bot-markdown-container ol {
+.bot-markdown-container ul,
+.bot-markdown-container ol {
   margin: 0.75rem 0;
   padding-left: 1.5rem;
   list-style-position: outside;
@@ -37,7 +38,8 @@
   margin-bottom: 0;
 }
 
-.bot-markdown-container strong, .bot-markdown-container bolder {
+.bot-markdown-container strong,
+.bot-markdown-container bolder {
   font-weight: 700;
   color: inherit;
   letter-spacing: -0.01em;
@@ -51,7 +53,9 @@
   font-size: 0.875rem;
 }
 
-.bot-markdown-container h1, .bot-markdown-container h2, .bot-markdown-container h3 {
+.bot-markdown-container h1,
+.bot-markdown-container h2,
+.bot-markdown-container h3 {
   font-weight: 800;
   margin-top: 1.25rem;
   margin-bottom: 0.75rem;
@@ -69,4 +73,50 @@
 /* User Message specific overrides if needed */
 .user-msg {
   white-space: pre-wrap;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar Scrollbar */
+.w-80::-webkit-scrollbar {
+  width: 4px;
+}
+
+.w-80::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.w-80::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+}
+
+/* Hover Effects */
+.session-item-active {
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent);
+  border-left: 3px solid #3b82f6;
+}
+
+/* Glassmorphism utility */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }

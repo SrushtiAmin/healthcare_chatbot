@@ -1,5 +1,6 @@
 import { LLMService, LLMProvider } from './llm.service';
 import { FunctionModule } from './function.module';
+import { RagService } from './rag.service';
 
 export interface RouteRequest {
     message: string;
@@ -21,9 +22,10 @@ export class RouterModule {
      * Routes user queries based on classification and ensures responses are LLM-generated.
      */
     public static async routeQuery(request: RouteRequest): Promise<RouteResponse> {
-        const { message, type, provider, model } = request;
+        const { message, type, provider, model, userId } = request;
 
         let context = '';
+        const ragService = RagService.getInstance();
 
         // Routing Logic based on Query Type
         switch (type) {
@@ -38,8 +40,8 @@ export class RouterModule {
                 break;
 
             case 'document':
-                // (Future) RAG → LLM integration point
-                context = await FunctionModule.getDocumentContext(message);
+                // RAG → LLM integration
+                context = await ragService.getContext(message, userId);
                 break;
 
             case 'general':
@@ -48,12 +50,27 @@ export class RouterModule {
                 break;
         }
 
-        // Build structured input for LLM
-        const structuredInput = `
-      User Query: "${message}"
-      Context: ${context || "None provided"}
-      Type: ${type}
-    `.trim();
+        // Build structured input for LLM with clear instructions
+        let structuredInput = '';
+        if (type === 'document' && context) {
+            structuredInput = `
+You are helping the user with an uploaded medical document. 
+Use the provided CONTEXT to answer the USER QUERY accurately. 
+If the answer is not in the context, state that clearly but still provide general healthcare guidance if relevant.
+
+CONTEXT FROM DOCUMENTS:
+${context}
+
+USER QUERY:
+"${message}"
+`.trim();
+        } else {
+            structuredInput = `
+User Query: "${message}"
+Context: ${context || "None provided"}
+Type: ${type}
+`.trim();
+        }
 
         // All responses generated through LLM Service
         const llmResponseText = await LLMService.generateResponse({

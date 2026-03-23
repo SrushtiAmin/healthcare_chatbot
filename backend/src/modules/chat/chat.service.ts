@@ -18,6 +18,7 @@ export class ChatService {
           responseText: "Please be restricted toward healthcare queries only.",
           type: 'blocked',
           reason: guardrail.reason,
+          sessionId: request.sessionId || 'temporary',
         };
       }
 
@@ -33,10 +34,30 @@ export class ChatService {
         userId: request.userId,
       });
 
-      // 4. SAVE TO DATABASE (Include all new fields)
+      // 4. SESSION HANDLING
+      let currentSessionId = request.sessionId;
+
+      if (!currentSessionId) {
+        // Create a new session if not provided
+        // Use first message as title (truncated)
+        const title = request.message.length > 30
+          ? request.message.substring(0, 27) + "..."
+          : request.message;
+
+        const session = await prisma.chatSession.create({
+          data: {
+            userId: request.userId,
+            title: title,
+          }
+        });
+        currentSessionId = session.id;
+      }
+
+      // 5. SAVE TO DATABASE (Include all new fields)
       await prisma.chat.create({
         data: {
           userId: request.userId,
+          sessionId: currentSessionId,
           message: request.message,
           response: routerResponse.response,
           type: queryType,
@@ -47,9 +68,16 @@ export class ChatService {
         },
       });
 
+      // Update session timestamp
+      await prisma.chatSession.update({
+        where: { id: currentSessionId },
+        data: { updatedAt: new Date() }
+      });
+
       return {
         responseText: routerResponse.response,
         type: queryType as ChatResponseType,
+        sessionId: currentSessionId,
       };
     } catch (error) {
       console.error('Error in ChatService:', error);
@@ -58,7 +86,30 @@ export class ChatService {
   }
 
   /**
-   * Fetch chat history for a specific user.
+   * Fetch all sessions for a specific user.
+   */
+  public static async getSessions(userId: string) {
+    return prisma.chatSession.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  /**
+   * Fetch all messages for a specific session.
+   */
+  public static async getSessionMessages(sessionId: string, userId: string) {
+    return prisma.chat.findMany({
+      where: {
+        sessionId,
+        userId // Ensure user owns the session
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * OBSOLETE: Old method to fetch chat history (all at once)
    */
   public static async getChatHistory(userId: string) {
     return prisma.chat.findMany({
