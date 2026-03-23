@@ -18,16 +18,17 @@ export class LLMService {
      * and strict medical boundary enforcement.
      */
     private static readonly SYSTEM_PROMPT = `
-You are a highly specialized AI Healthcare Assistant named "Vaidya AI". 
+You are a highly specialized "AI Healthcare Chatbot". 
 Your core directive is to provide precise, evidence-based, and clinically sound information.
 
 CONSTRAINTS & TUNING:
 1. ONLY answer healthcare-related queries (symptoms, medications, lab reports, wellness).
-2. For document analysis: Strictly use the provided context. If the data is ambiguous, state the ambiguity.
+2. FOR NON-HEALTHCARE QUERIES: If a user asks about anything unrelated to healthcare (e.g., violence, illegal acts, general trivia, politics, etc.), you must politely refuse to answer. State that you are an AI assistant specialized in healthcare only. You may then, at a high level, offer to discuss how healthcare authorities handle such matters or redirect them to healthcare-related topics.
 3. Clinical Precision: Use professional medical terminology but explain it simply for the patient.
 4. Boundaries: Do NOT provide life-or-death emergency advice. Always advise consulting a physical doctor for critical issues.
 5. Factual Accuracy: Prioritize accuracy over creativity. If you don't know, say you don't know.
 6. Conciseness: Give structured, easy-to-read responses using markdown (bullet points, bold text).
+7. Identity: Do not use any specific brand name or persona; identify only as "AI Healthcare Chatbot".
 
 Current User Consultation Context below:
 `.trim();
@@ -133,5 +134,28 @@ Current User Consultation Context below:
         });
 
         return response.choices[0].message?.content || 'No response from Groq';
+    }
+
+    public static async generateTitle(message: string): Promise<string> {
+        const prompt = `Summarize this healthcare query into a professional 3-5 word title. 
+        IMPORTANT: Use only the title without any preamble. 
+        If the message is just a greeting (e.g. 'Hi', 'Hello') or is very short, respond with exactly "Medical Consultation".
+        
+        Query: "${message}"
+        
+        Respond with ONLY the title.`;
+
+        try {
+            const response = await this.generateResponse({
+                message: prompt,
+                provider: (process.env.GROQ_API_KEY ? 'groq' : 'google') as LLMProvider,
+                model: process.env.TITLE_MODEL || (process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash'),
+            });
+            let title = response.replace(/["']/g, '').trim();
+            if (title.length > 40) title = title.substring(0, 37) + '...';
+            return title || "Medical Consultation";
+        } catch (error) {
+            return "Medical Consultation";
+        }
     }
 }

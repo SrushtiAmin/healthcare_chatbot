@@ -41,10 +41,9 @@ export class GuardrailService {
             if (response.trim().toUpperCase().startsWith('YES')) {
                 return { isAllowed: true };
             } else {
-                const reason = response.substring(response.indexOf('NO') + 2).trim() || 'Not a healthcare query.';
                 return {
                     isAllowed: false,
-                    reason: "Please be restricted toward healthcare queries only."
+                    reason: "Sorry, I can only answer health or medical related questions. You can also upload medical-related images and files for analysis."
                 };
             }
         } catch (error) {

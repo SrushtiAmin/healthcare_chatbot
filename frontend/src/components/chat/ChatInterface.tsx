@@ -236,7 +236,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
       case 'symptom': return 'bg-emerald-50 text-emerald-900 border-emerald-100';
       case 'medicine': return 'bg-indigo-50 text-indigo-900 border-indigo-100';
       case 'document': return 'bg-amber-50 text-amber-900 border-amber-100';
-      case 'blocked': return 'bg-rose-50 text-rose-900 border-rose-100';
+      case 'blocked': return 'bg-slate-50 text-slate-900 border-slate-200';
       default: return 'bg-white text-slate-900 border-slate-200';
     }
   };
@@ -397,15 +397,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
                     <p className="whitespace-pre-wrap leading-relaxed text-[15px] font-medium">{msg.text}</p>
                   )}
 
-                  {msg.sender === 'bot' && msg.type && msg.type !== 'general' && (
-                    <div className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-60 border-t border-black/5 pt-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${msg.type === 'blocked' ? 'bg-red-500' : 'bg-blue-500'}`}></span>
-                      Status: {msg.type === 'blocked' ? 'Flagged/Restricted' : 'Medical Analysis'}
-                    </div>
-                  )}
+
                 </div>
                 <span className="text-[10px] text-slate-400 mt-2 mx-1 font-bold uppercase tracking-tight opacity-70">
-                  {msg.sender === 'user' ? 'You' : 'Health Assistant'} • {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {msg.sender === 'user' ? 'You' : 'AI Healthcare Chatbot'} • {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             ))

@@ -33,13 +33,11 @@ export class ChatController {
       // 4. Call service logic
       const chatResponse = await ChatService.processChat(chatRequest);
 
-      // Handle guardrail blocking
+      // Handle guardrail blocking (Return as success so it shows as a normal message)
       if (chatResponse.type === 'blocked') {
-        res.status(403).json({
-          success: false,
-          message: chatResponse.responseText,
-          reason: chatResponse.reason,
-          data: chatResponse, // Include sessionId even if blocked
+        res.status(200).json({
+          success: true,
+          data: chatResponse,
         });
         return;
       }

@@ -11,16 +11,17 @@ export class ChatService {
    */
   public static async processChat(request: ChatRequest): Promise<ChatResponse> {
     try {
-      // 1. Guardrail (BLOCK non-healthcare queries)
+      // 1. Guardrail (BLOCK non-healthcare/safety violations)
       const guardrail = await GuardrailService.checkMessage(request.message);
       if (!guardrail.isAllowed) {
         return {
-          responseText: "Please be restricted toward healthcare queries only.",
+          responseText: "Sorry, I can only answer health or medical related questions. You can also upload medical-related images and files for analysis.",
           type: 'blocked',
           reason: guardrail.reason,
           sessionId: request.sessionId || 'temporary',
         };
       }
+      const isActuallyBlocked = false; // Proceed only if allowed
 
       // 2. Classifier (Determine query type)
       const queryType = await ClassifierService.classifyMessage(request.message);
@@ -39,18 +40,24 @@ export class ChatService {
 
       if (!currentSessionId) {
         // Create a new session if not provided
-        // Use first message as title (truncated)
-        const title = request.message.length > 30
-          ? request.message.substring(0, 27) + "..."
-          : request.message;
-
+        const title = await LLMService.generateTitle(request.message);
         const session = await prisma.chatSession.create({
-          data: {
-            userId: request.userId,
-            title: title,
-          }
+          data: { userId: request.userId, title }
         });
         currentSessionId = session.id;
+      } else if (queryType !== 'general') {
+        // AUTO-UPDATE TITLE: If the session already exists but the current query is specific (symptom/medicine/doc)
+        // and its current title was generic, update it to reflect the core topic.
+        const session = await prisma.chatSession.findUnique({ where: { id: currentSessionId } });
+        const genericTitles = ['Medical Consultation', 'Hi', 'Hello', 'New Chat'];
+
+        if (session && genericTitles.some(gt => session.title?.toLowerCase().includes(gt.toLowerCase()))) {
+          const newTitle = await LLMService.generateTitle(request.message);
+          await prisma.chatSession.update({
+            where: { id: currentSessionId },
+            data: { title: newTitle }
+          });
+        }
       }
 
       // 5. SAVE TO DATABASE (Include all new fields)
@@ -76,7 +83,7 @@ export class ChatService {
 
       return {
         responseText: routerResponse.response,
-        type: queryType as ChatResponseType,
+        type: (isActuallyBlocked ? 'blocked' : queryType) as ChatResponseType,
         sessionId: currentSessionId,
       };
     } catch (error) {
