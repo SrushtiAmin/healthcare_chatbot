@@ -296,21 +296,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
                   <p className="text-slate-600 text-xs">No documents in this session</p>
                 </div>
               ) : (
-                files.map((file) => (
-                  <div key={file.id} className="group p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/50 transition-all flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${file.type === 'pdf' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                      {file.type === 'pdf' ? (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
-                      ) : (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" /></svg>
-                      )}
+                files.map((file) => {
+                  const isPDF = file.type === 'pdf';
+                  const isImage = file.type === 'image';
+                  const isDoc = file.type === 'word';
+                  const isData = ['csv', 'excel'].includes(file.type as string);
+
+                  return (
+                    <div key={file.id} className="group p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/50 transition-all flex items-center gap-3">
+                      <div className={`p-2 rounded-lg 
+                        ${isPDF ? 'bg-red-500/10 text-red-400' :
+                          isImage ? 'bg-blue-500/10 text-blue-400' :
+                            isDoc ? 'bg-indigo-500/10 text-indigo-400' :
+                              isData ? 'bg-emerald-500/10 text-emerald-400' :
+                                'bg-slate-500/10 text-slate-400'
+                        }`}>
+                        {isPDF && <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>}
+                        {isImage && <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" /></svg>}
+                        {isDoc && <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                        {isData && <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                        {!isPDF && !isImage && !isDoc && !isData && <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="truncate text-[11px] font-bold text-slate-300">{file.name}</p>
+                        <p className="text-[9px] text-slate-500 uppercase tracking-tighter">{file.type} indexed</p>
+                      </div>
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="truncate text-[11px] font-bold text-slate-300">{file.name}</p>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-tighter">{file.type} indexed</p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -442,7 +455,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
                 ref={fileInputRef}
                 onChange={handleFileUpload}
                 className="hidden"
-                accept=".pdf,image/*"
+                accept={".pdf,image/*,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt,.md"}
               />
               <button
                 type="button"

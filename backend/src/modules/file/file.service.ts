@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 const pdf = require('pdf-parse');
 import Tesseract from 'tesseract.js';
+import mammoth from 'mammoth';
+const officeParser = require('officeparser');
+import Papa from 'papaparse';
 import { RagService } from '../chat/rag.service';
 import { GuardrailService } from '../chat/guardrail';
 import prisma from '../../lib/prisma';
@@ -23,8 +26,9 @@ export class FileService {
     }
 
     public async upload(file: Express.Multer.File, userId: string, sessionId?: string) {
-        // 1. Extract content first
-        let type: 'pdf' | 'image' = file.mimetype.includes('pdf') ? 'pdf' : 'image';
+        // 1. Detect File Type and Ext
+        const ext = path.extname(file.originalname).toLowerCase();
+        let type = this.getFileType(file.mimetype, ext);
 
         let text = '';
         try {
@@ -64,16 +68,63 @@ export class FileService {
         return newFile;
     }
 
+    private getFileType(mimetype: string, ext: string): string {
+        if (mimetype.includes('pdf')) return 'pdf';
+        if (mimetype.includes('image')) return 'image';
+        if (ext === '.docx' || ext === '.doc') return 'word';
+        if (ext === '.pptx' || ext === '.ppt') return 'powerpoint';
+        if (ext === '.xlsx' || ext === '.xls') return 'excel';
+        if (ext === '.csv') return 'csv';
+        if (ext === '.txt' || ext === '.md') return 'text';
+        return 'other';
+    }
+
     private async extractText(filePath: string, type: string): Promise<string> {
         const absolutePath = path.resolve(filePath);
-        if (type === 'pdf') {
-            const dataBuffer = await fs.readFile(absolutePath);
-            const data = await pdf(dataBuffer);
-            return data.text;
-        } else {
-            // Image processing with Tesseract
-            const { data: { text } } = await Tesseract.recognize(absolutePath, 'eng');
-            return text;
+
+        switch (type) {
+            case 'pdf':
+                const dataBuffer = await fs.readFile(absolutePath);
+                const data = await pdf(dataBuffer);
+                return data.text;
+
+            case 'word':
+                const wordResult = await mammoth.extractRawText({ path: absolutePath });
+                return wordResult.value;
+
+            case 'powerpoint':
+            case 'excel':
+                return new Promise((resolve, reject) => {
+                    officeParser.parseOffice(absolutePath, (data: any, err: any) => {
+                        if (err) return reject(new Error(`Office parsing failed: ${err}`));
+                        resolve(data);
+                    });
+                });
+
+            case 'csv':
+                const csvData = await fs.readFile(absolutePath, 'utf8');
+                const parsedCsv = Papa.parse(csvData, { header: true });
+                return JSON.stringify(parsedCsv.data, null, 2);
+
+            case 'text':
+                return await fs.readFile(absolutePath, 'utf8');
+
+            case 'image':
+                const { data: { text } } = await Tesseract.recognize(absolutePath, 'eng');
+                return text;
+
+            default:
+                // try office parser as last resort for "other" types
+                try {
+                    return await new Promise((resolve, reject) => {
+                        officeParser.parseOffice(absolutePath, (data: any, err: any) => {
+                            if (err) return reject(err);
+                            resolve(data);
+                        });
+                    });
+                } catch (e) {
+                    return ""; // fallback to empty instead of crashing
+                }
         }
     }
 

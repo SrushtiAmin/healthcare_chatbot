@@ -4,7 +4,7 @@ export interface UploadedFile {
     id: string;
     name: string;
     url: string;
-    type: 'pdf' | 'image';
+    type: 'pdf' | 'image' | 'word' | 'powerpoint' | 'excel' | 'csv' | 'text' | 'other';
     createdAt: string;
 }
 

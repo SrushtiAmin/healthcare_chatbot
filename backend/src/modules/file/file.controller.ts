@@ -15,11 +15,25 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-        if (allowedTypes.includes(file.mimetype)) {
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv',
+            'text/plain',
+            'text/markdown'
+        ];
+        if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(docx|doc|pptx|ppt|xlsx|xls|csv|txt|md)$/i)) {
             cb(null, true);
         } else {
-            cb(new Error('Invalid file type. Only PDF and Images (JPG, PNG, WEBP) are allowed.'));
+            cb(new Error('Invalid file type. Supported: PDF, Images, Word, PPT, Excel, CSV, and Text.'));
         }
     }
 });
