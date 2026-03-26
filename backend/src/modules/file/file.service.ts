@@ -5,6 +5,7 @@ import Tesseract from 'tesseract.js';
 import { RagService } from '../chat/rag.service';
 import { GuardrailService } from '../chat/guardrail';
 import prisma from '../../lib/prisma';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
 export class FileService {
     private static instance: FileService;
@@ -56,8 +57,8 @@ export class FileService {
             },
         });
 
-        // 4. Chunk and Embed
-        const chunks = this.chunkText(text);
+        // 4. Chunk and Embed using LangChain's RecursiveCharacterTextSplitter
+        const chunks = await this.chunkText(text);
         await this.ragService.addChunks(chunks, newFile.id, userId);
 
         return newFile;
@@ -76,23 +77,14 @@ export class FileService {
         }
     }
 
-    private chunkText(text: string, size: number = 1000, overlap: number = 200): string[] {
-        const chunks: string[] = [];
-        let start = 0;
-        while (start < text.length) {
-            let end = start + size;
-            if (end < text.length) {
-                const lastSpace = text.lastIndexOf(' ', end);
-                if (lastSpace > start) {
-                    end = lastSpace;
-                }
-            }
-            chunks.push(text.substring(start, end).trim());
-            start = end - overlap;
-            if (start < 0) start = 0;
-            if (end >= text.length) break;
-        }
-        return chunks.filter(c => c.length > 50);
+    private async chunkText(text: string): Promise<string[]> {
+        const splitter = new RecursiveCharacterTextSplitter({
+            chunkSize: 1000,
+            chunkOverlap: 200,
+        });
+
+        const output = await splitter.createDocuments([text]);
+        return output.map(doc => doc.pageContent);
     }
 
     public async getFiles(userId: string) {
@@ -109,3 +101,4 @@ export class FileService {
         });
     }
 }
+

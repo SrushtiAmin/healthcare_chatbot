@@ -4,6 +4,7 @@ import { GuardrailService } from './guardrail';
 import { ClassifierService } from './classifier';
 import { LLMService } from './llm.service';
 import { RouterModule } from './router';
+import { AIMessage, HumanMessage, BaseMessage } from '@langchain/core/messages';
 
 export class ChatService {
   /**
@@ -21,33 +22,48 @@ export class ChatService {
           sessionId: request.sessionId || 'temporary',
         };
       }
-      const isActuallyBlocked = false; // Proceed only if allowed
+      const isActuallyBlocked = false;
 
-      // 2. Classifier (Determine query type)
+      // 2. Fetch Chat History for context-aware conversation (Memory)
+      let history: BaseMessage[] = [];
+      if (request.sessionId) {
+        const lastMessages = await prisma.chat.findMany({
+          where: { sessionId: request.sessionId, userId: request.userId },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        });
+
+        // Reverse to get chronological order and map to LangChain classes
+        history = lastMessages.reverse().map(msg => {
+          return msg.response
+            ? [new HumanMessage(msg.message), new AIMessage(msg.response)]
+            : [new HumanMessage(msg.message)];
+        }).flat();
+      }
+
+      // 3. Classifier (Determine query type)
       const queryType = await ClassifierService.classifyMessage(request.message);
 
-      // 3. Router Module (Centralized routing based on classification)
+      // 4. Router Module (Using LangChain Chain internally)
       const routerResponse = await RouterModule.routeQuery({
         message: request.message,
         type: queryType,
         provider: request.provider,
         model: request.model,
         userId: request.userId,
+        history, // Pass history to LangChain
       });
 
-      // 4. SESSION HANDLING
+      // 5. SESSION HANDLING
       let currentSessionId = request.sessionId;
 
       if (!currentSessionId) {
-        // Create a new session if not provided
         const title = await LLMService.generateTitle(request.message);
         const session = await prisma.chatSession.create({
           data: { userId: request.userId, title }
         });
         currentSessionId = session.id;
       } else if (queryType !== 'general') {
-        // AUTO-UPDATE TITLE: If the session already exists but the current query is specific (symptom/medicine/doc)
-        // and its current title was generic, update it to reflect the core topic.
         const session = await prisma.chatSession.findUnique({ where: { id: currentSessionId } });
         const genericTitles = ['Medical Consultation', 'Hi', 'Hello', 'New Chat'];
 
@@ -60,7 +76,7 @@ export class ChatService {
         }
       }
 
-      // 5. SAVE TO DATABASE (Include all new fields)
+      // 6. SAVE TO DATABASE
       await prisma.chat.create({
         data: {
           userId: request.userId,
@@ -75,7 +91,6 @@ export class ChatService {
         },
       });
 
-      // Update session timestamp
       await prisma.chatSession.update({
         where: { id: currentSessionId },
         data: { updatedAt: new Date() }
@@ -92,9 +107,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * Fetch all sessions for a specific user.
-   */
   public static async getSessions(userId: string) {
     return prisma.chatSession.findMany({
       where: { userId },
@@ -102,22 +114,13 @@ export class ChatService {
     });
   }
 
-  /**
-   * Fetch all messages for a specific session.
-   */
   public static async getSessionMessages(sessionId: string, userId: string) {
     return prisma.chat.findMany({
-      where: {
-        sessionId,
-        userId // Ensure user owns the session
-      },
+      where: { sessionId, userId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  /**
-   * OBSOLETE: Old method to fetch chat history (all at once)
-   */
   public static async getChatHistory(userId: string) {
     return prisma.chat.findMany({
       where: { userId },
@@ -125,3 +128,4 @@ export class ChatService {
     });
   }
 }
+

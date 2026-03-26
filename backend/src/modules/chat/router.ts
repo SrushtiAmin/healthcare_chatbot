@@ -1,6 +1,9 @@
 import { LLMService, LLMProvider } from './llm.service';
 import { FunctionModule } from './function.module';
 import { RagService } from './rag.service';
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
+import { BaseMessage } from '@langchain/core/messages';
 
 export interface RouteRequest {
     message: string;
@@ -8,6 +11,7 @@ export interface RouteRequest {
     provider: LLMProvider;
     model: string;
     userId: string;
+    history?: BaseMessage[];
 }
 
 export interface RouteResponse {
@@ -19,71 +23,65 @@ export interface RouteResponse {
 
 export class RouterModule {
     /**
-     * Routes user queries based on classification and ensures responses are LLM-generated.
+     * Routes user queries based on classification and ensures responses are LLM-generated using LangChain.
      */
     public static async routeQuery(request: RouteRequest): Promise<RouteResponse> {
-        const { message, type, provider, model, userId } = request;
+        const { message, type, provider, model, userId, history = [] } = request;
 
         let context = '';
         const ragService = RagService.getInstance();
 
-        // Routing Logic based on Query Type
+        // 1. Retrieval Logic based on Query Type
         switch (type) {
             case 'symptom':
-                // Call Function Module (Mock) to simulate context retrieval
                 context = await FunctionModule.getSymptomContext(message);
                 break;
-
             case 'medicine':
-                // Call Function Module (Mock) for medication context
                 context = await FunctionModule.getMedicineContext(message);
                 break;
-
             case 'document':
-                // RAG → LLM integration
                 context = await ragService.getContext(message, userId);
                 break;
-
-            case 'general':
             default:
-                // Direct LLM call with no context
                 break;
         }
 
-        // Build structured input for LLM with clear instructions
-        let structuredInput = '';
-        if (type === 'document' && context) {
-            structuredInput = `
-You are helping the user with an uploaded medical document. 
-Use the provided CONTEXT to answer the USER QUERY accurately. 
-If the answer is not in the context, state that clearly but still provide general healthcare guidance if relevant.
+        // 2. Build LangChain Prompt Template
+        const promptTemplate = ChatPromptTemplate.fromMessages([
+            ["system", LLMService.SYSTEM_PROMPT],
+            new MessagesPlaceholder("chat_history"),
+            ["human", "{input_with_context}"]
+        ]);
 
-CONTEXT FROM DOCUMENTS:
+        // 3. Construct Input with Context
+        let inputWithContext = '';
+        if (context) {
+            inputWithContext = `
+CONTEXT INFORMATION:
 ${context}
 
 USER QUERY:
 "${message}"
 `.trim();
         } else {
-            structuredInput = `
-User Query: "${message}"
-Context: ${context || "None provided"}
-Type: ${type}
-`.trim();
+            inputWithContext = message;
         }
 
-        // All responses generated through LLM Service
-        const llmResponseText = await LLMService.generateResponse({
-            message: structuredInput,
-            provider,
-            model,
+        // 4. Create and Invoke LangChain Chain
+        const chatModel = LLMService.getChatModel(provider, model);
+        const chain = promptTemplate.pipe(chatModel).pipe(new StringOutputParser());
+
+        const response = await chain.invoke({
+            chat_history: history,
+            input_with_context: inputWithContext,
         });
 
         return {
-            response: llmResponseText,
+            response,
             type,
             source: "llm",
             context: context || undefined,
         };
     }
 }
+
