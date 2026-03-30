@@ -10,6 +10,8 @@ import { GuardrailService } from '../chat/guardrail';
 import prisma from '../../lib/prisma';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
+import { ERROR_MESSAGES, EXTENSION_TO_TYPE, SUPPORTED_FILE_TYPES, MIMETYPE_TO_TYPE } from '../../utils/constants';
+
 export class FileService {
     private static instance: FileService;
     private ragService: RagService;
@@ -35,19 +37,19 @@ export class FileService {
             text = await this.extractText(file.path, type);
         } catch (error: any) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error(`Extraction failed: ${error.message}`);
+            throw new Error(`${ERROR_MESSAGES.EXTRACTION_FAILED}: ${error.message}`);
         }
 
         if (!text || text.trim().length < 20) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error("Rejection: The uploaded file appears to be empty or contains no extractable text.");
+            throw new Error(ERROR_MESSAGES.FILE_EMPTY);
         }
 
         // 2. Check for Medical Relevance
         const relevanceCheck = await GuardrailService.checkMessage(text.substring(0, 2000));
         if (!relevanceCheck.isAllowed) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error(`Rejection: The uploaded document does not appear to be healthcare-related. ${relevanceCheck.reason || ""}`);
+            throw new Error(`${ERROR_MESSAGES.FILE_NOT_HEALTH_RELATED} ${relevanceCheck.reason || ""}`);
         }
 
         // 3. Save file model to DB verified
@@ -69,62 +71,54 @@ export class FileService {
     }
 
     private getFileType(mimetype: string, ext: string): string {
-        if (mimetype.includes('pdf')) return 'pdf';
-        if (mimetype.includes('image')) return 'image';
-        if (ext === '.docx' || ext === '.doc') return 'word';
-        if (ext === '.pptx' || ext === '.ppt') return 'powerpoint';
-        if (ext === '.xlsx' || ext === '.xls') return 'excel';
-        if (ext === '.csv') return 'csv';
-        if (ext === '.txt' || ext === '.md') return 'text';
-        return 'other';
+        return MIMETYPE_TO_TYPE[mimetype] || EXTENSION_TO_TYPE[ext] || SUPPORTED_FILE_TYPES.OTHER;
+    }
+
+    private extractionHandlers: Record<string, (path: string) => Promise<string>> = {
+        [SUPPORTED_FILE_TYPES.PDF]: async (path) => {
+            const buffer = await fs.readFile(path);
+            const data = await pdf(buffer);
+            return data.text;
+        },
+        [SUPPORTED_FILE_TYPES.WORD]: async (path) => {
+            const result = await mammoth.extractRawText({ path });
+            return result.value;
+        },
+        [SUPPORTED_FILE_TYPES.POWERPOINT]: async (path) => this.parseOfficeFile(path),
+        [SUPPORTED_FILE_TYPES.EXCEL]: async (path) => this.parseOfficeFile(path),
+        [SUPPORTED_FILE_TYPES.CSV]: async (path) => {
+            const data = await fs.readFile(path, 'utf8');
+            return JSON.stringify(Papa.parse(data, { header: true }).data, null, 2);
+        },
+        [SUPPORTED_FILE_TYPES.TEXT]: async (path) => fs.readFile(path, 'utf8'),
+        [SUPPORTED_FILE_TYPES.IMAGE]: async (path) => {
+            const { data: { text } } = await Tesseract.recognize(path, 'eng');
+            return text;
+        }
+    };
+
+    private async parseOfficeFile(path: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            officeParser.parseOffice(path, (data: any, err: any) => {
+                if (err) return reject(new Error(`Office parsing failed: ${err}`));
+                resolve(data);
+            });
+        });
     }
 
     private async extractText(filePath: string, type: string): Promise<string> {
         const absolutePath = path.resolve(filePath);
+        const handler = this.extractionHandlers[type];
 
-        switch (type) {
-            case 'pdf':
-                const dataBuffer = await fs.readFile(absolutePath);
-                const data = await pdf(dataBuffer);
-                return data.text;
+        if (handler) {
+            return handler(absolutePath);
+        }
 
-            case 'word':
-                const wordResult = await mammoth.extractRawText({ path: absolutePath });
-                return wordResult.value;
-
-            case 'powerpoint':
-            case 'excel':
-                return new Promise((resolve, reject) => {
-                    officeParser.parseOffice(absolutePath, (data: any, err: any) => {
-                        if (err) return reject(new Error(`Office parsing failed: ${err}`));
-                        resolve(data);
-                    });
-                });
-
-            case 'csv':
-                const csvData = await fs.readFile(absolutePath, 'utf8');
-                const parsedCsv = Papa.parse(csvData, { header: true });
-                return JSON.stringify(parsedCsv.data, null, 2);
-
-            case 'text':
-                return await fs.readFile(absolutePath, 'utf8');
-
-            case 'image':
-                const { data: { text } } = await Tesseract.recognize(absolutePath, 'eng');
-                return text;
-
-            default:
-                // try office parser as last resort for "other" types
-                try {
-                    return await new Promise((resolve, reject) => {
-                        officeParser.parseOffice(absolutePath, (data: any, err: any) => {
-                            if (err) return reject(err);
-                            resolve(data);
-                        });
-                    });
-                } catch (e) {
-                    return ""; // fallback to empty instead of crashing
-                }
+        // Fallback for "other" types
+        try {
+            return await this.parseOfficeFile(absolutePath);
+        } catch {
+            return "";
         }
     }
 

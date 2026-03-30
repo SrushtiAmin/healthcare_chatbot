@@ -1,4 +1,7 @@
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
 import { LLMService, LLMProvider } from './llm.service';
+import { ERROR_MESSAGES } from '../../utils/constants';
 
 export interface GuardrailResult {
     isAllowed: boolean;
@@ -7,63 +10,39 @@ export interface GuardrailResult {
 
 export class GuardrailService {
     /**
-     * Checks if the message is healthcare-related using a lightweight LLM call.
+     * Checks if the message is healthcare-related using a native LangChain sequence.
      */
     public static async checkMessage(message: string): Promise<GuardrailResult> {
-        try {
-            // For guardrail, we use a lightweight model by default (e.g., Llama 3 8B on Groq or Gemini Flash)
-            // If no API keys, we fall back to a simple keyword check
-            const prompt = `You are a healthcare assistant guardrail. 
-      Determine if the following user query is related to healthcare (symptoms, medicine, documents) OR is a greeting/introductory message (like 'Hi', 'Hello', 'Who are you?').
-      Respond with strictly 'YES' if it is related or a valid greeting, or 'NO' followed by a brief reason if it is clearly unrelated to healthcare or your role as an assistant.
-      Query: "${message}"`;
+        const provider = (process.env.GROQ_API_KEY ? 'groq' : (process.env.GEMINI_API_KEY ? 'google' : null)) as LLMProvider;
 
-            let response = '';
-
-            // Attempt to use Groq as a fast/cheap guardrail
-            if (process.env.GROQ_API_KEY) {
-                response = await LLMService.generateResponse({
-                    message: prompt,
-                    provider: 'groq',
-                    model: process.env.GUARDRAIL_MODEL || 'llama-3.3-70b-versatile',
-                });
-            } else if (process.env.GEMINI_API_KEY) {
-                response = await LLMService.generateResponse({
-                    message: prompt,
-                    provider: 'google',
-                    model: process.env.GUARDRAIL_MODEL || 'gemini-1.5-flash',
-                });
-            } else {
-                // Fallback to keyword check if no LLM APIs are available
-                return this.keywordCheck(message);
-            }
-
-            if (response.trim().toUpperCase().startsWith('YES')) {
-                return { isAllowed: true };
-            } else {
-                return {
-                    isAllowed: false,
-                    reason: "Sorry, I can only answer health or medical related questions. You can also upload medical-related images and files for analysis."
-                };
-            }
-        } catch (error) {
-            console.warn('Guardrail LLM failed, falling back to keywords:', error);
-            return this.keywordCheck(message);
+        if (!provider) {
+            console.warn('Safety guardrail running unrestricted (No AI keys)');
+            return { isAllowed: true };
         }
-    }
 
-    private static keywordCheck(message: string): GuardrailResult {
-        const healthcareKeywords = [
-            'health', 'medicine', 'symptom', 'pain', 'doctor', 'pill', 'dose', 'fever',
-            'medical', 'report', 'lab', 'test', 'blood', 'heart', 'headache', 'prescription',
-            'hi', 'hello', 'hey', 'greetings', 'help', 'who'
-        ];
-        const lowerMessage = message.toLowerCase();
-        const isAllowed = healthcareKeywords.some(kw => lowerMessage.includes(kw));
+        try {
+            const chatModel = LLMService.getChatModel(provider, process.env.GUARDRAIL_MODEL || '');
 
-        return {
-            isAllowed,
-            reason: isAllowed ? undefined : "Please be restricted toward healthcare queries only."
-        };
+            // Native LangChain Prompt Template
+            const promptTemplate = ChatPromptTemplate.fromMessages([
+                ['system', 'You are a healthcare assistant security monitor. Respond with "YES" if the user input is about medical topics, health reports, symptoms, or greetings. Otherwise respond with "NO" and a brief reason.'],
+                ['user', '{input}']
+            ]);
+
+            // Build a LangChain RunnableSequence (Modern Module Pattern)
+            const chain = promptTemplate.pipe(chatModel).pipe(new StringOutputParser());
+
+            // Run the LangChain Module
+            const response = await chain.invoke({ input: message });
+
+            const isAllowed = response.trim().toUpperCase().startsWith('YES');
+            return {
+                isAllowed,
+                reason: isAllowed ? undefined : response.replace(/^NO[:\s]*/i, '').trim() || ERROR_MESSAGES.NOT_HEALTH_RELATED
+            };
+        } catch (error) {
+            console.error('LangChain Guardrail Module Error:', error);
+            return { isAllowed: true };
+        }
     }
 }
