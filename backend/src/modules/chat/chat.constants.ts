@@ -1,71 +1,20 @@
-/**
- * Centralized constants and configuration for the healthcare chatbot.
- */
+import { LLMProvider } from './chat.types';
 
 export const ERROR_MESSAGES = {
     UNAUTHORIZED: "You must be signed in to access this resource.",
     NOT_HEALTH_RELATED: "Sorry, I can only answer health or medical related questions. You can also upload medical-related images and files for analysis.",
-    FILE_EMPTY: "Rejection: The uploaded file appears to be empty or contains no extractable text.",
-    FILE_NOT_HEALTH_RELATED: "Rejection: The uploaded document does not appear to be healthcare-related.",
-    INVALID_FILE_TYPE: "Invalid file type. Please upload a supported medical document.",
-    EXTRACTION_FAILED: "Extraction failed for the uploaded document."
 };
-
-export const SUPPORTED_FILE_TYPES = {
-    PDF: 'pdf',
-    IMAGE: 'image',
-    WORD: 'word',
-    POWERPOINT: 'powerpoint',
-    EXCEL: 'excel',
-    CSV: 'csv',
-    TEXT: 'text',
-    OTHER: 'other'
-} as const;
-
-export type FileType = typeof SUPPORTED_FILE_TYPES[keyof typeof SUPPORTED_FILE_TYPES];
-
-export const MIMETYPE_TO_TYPE: Record<string, FileType> = {
-    'application/pdf': 'pdf',
-    'image/jpeg': 'image',
-    'image/png': 'image',
-    'image/webp': 'image',
-    'image/gif': 'image',
-    'text/plain': 'text',
-    'text/markdown': 'text',
-    'text/csv': 'csv',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'word',
-    'application/msword': 'word',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'excel',
-    'application/vnd.ms-excel': 'excel',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'powerpoint',
-    'application/vnd.ms-powerpoint': 'powerpoint'
-};
-
-export const EXTENSION_TO_TYPE: Record<string, FileType> = {
-    '.pdf': 'pdf',
-    '.docx': 'word',
-    '.doc': 'word',
-    '.pptx': 'powerpoint',
-    '.ppt': 'powerpoint',
-    '.xlsx': 'excel',
-    '.xls': 'excel',
-    '.csv': 'csv',
-    '.txt': 'text',
-    '.md': 'text'
-};
-
-export const ALLOWED_MIMETYPES = Object.keys(MIMETYPE_TO_TYPE);
-export const ALLOWED_EXTENSIONS = Object.keys(EXTENSION_TO_TYPE);
 
 export const AI_CONFIG = {
     DEFAULT_TEMPERATURE: 0.1,
-    DEFAULT_PROVIDER: (process.env.GROQ_API_KEY ? 'groq' : (process.env.GEMINI_API_KEY ? 'google' : 'openai')) as any,
+    DEFAULT_PROVIDER: (process.env.GROQ_API_KEY ? 'groq' : (process.env.GEMINI_API_KEY ? 'google' : 'openai')) as LLMProvider,
     MODELS: {
         GPT4: 'gpt-4o',
         GEMINI: 'gemini-1.5-flash',
         CLAUDE: 'claude-3-5-sonnet-20240620',
         LLAMA: 'llama-3.3-70b-versatile'
     },
+    PROVIDERS: ['openai', 'google', 'anthropic', 'groq'] as const,
     GENERIC_TITLES: ['Medical Consultation', 'Hi', 'Hello', 'New Chat', 'Untitled Chat']
 };
 
@@ -85,7 +34,7 @@ CONSTRAINTS & TUNING:
 
 Current User Consultation Context below:
 `.trim(),
-    GUARDRAIL_SYSTEM: 'You are a healthcare assistant security monitor. Respond with "YES" if the user input is about medical topics, health reports, symptoms, or greetings. Otherwise respond with "NO" and a brief reason.',
+    GUARDRAIL_SYSTEM: 'You are a healthcare assistant security monitor. Respond with "YES" if the user input or document content is about medical topics, health reports, clinical data, patient records, medications, symptoms, wellness, greetings, or references to uploaded medical files. If the user is asking to analyze or check their documents, it is allowed. Even if the content is just a list of medical values or a laboratory report, it is allowed. Otherwise respond with "NO" and a brief reason.',
     TITLE_GENERATION: (message: string) => `Summarize this healthcare query into a professional 3-5 word title. 
         IMPORTANT: Use only the title without any preamble. 
         If the message is just a greeting (e.g. 'Hi', 'Hello') or is very short, respond with exactly "Medical Consultation".
@@ -100,5 +49,17 @@ Current User Consultation Context below:
       - 'general': all other healthcare interactions (e.g., greetings, health tips, scheduling). 
 
       Respond with ONLY one word from the above categories.
-      Query: "${message}"`
+      Query: "${message}"`,
+    SYMPTOM_EXTRACTION: (message: string) => `You are a medical knowledge extractor. Analyze the symptoms mentioned in: "${message}".
+      Provide detailed context including:
+      - Potential related conditions
+      - Severity indicators (when to seek immediate help)
+      - Standard clinical assessment steps
+      Respond with factual, structured clinical data only. No conversational filler.`,
+    MEDICINE_EXTRACTION: (message: string) => `You are a pharmacology expert. Analyze the medication query: "${message}".
+      Provide detailed context including:
+      - Common medical uses
+      - General dosage guidelines and precautions
+      - Potential side effects and warnings
+      Respond with factual pharmacology data only. No conversational filler.`
 };

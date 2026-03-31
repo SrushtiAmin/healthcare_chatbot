@@ -1,10 +1,11 @@
 import prisma from '../../lib/prisma';
 import { ChatRequest, ChatResponse, ChatResponseType } from './chat.types';
-import { GuardrailService } from './guardrail';
-import { ClassifierService } from './classifier';
+import { GuardrailService } from './guardrail.service';
+import { ClassifierService } from './classifier.service';
 import { LLMService } from './llm.service';
-import { RouterModule } from './router';
+import { RouterModule } from './router.service';
 import { AIMessage, HumanMessage, BaseMessage } from '@langchain/core/messages';
+import { ERROR_MESSAGES, AI_CONFIG } from './chat.constants';
 
 export class ChatService {
   /**
@@ -16,7 +17,7 @@ export class ChatService {
       const guardrail = await GuardrailService.checkMessage(request.message);
       if (!guardrail.isAllowed) {
         return {
-          responseText: "Sorry, I can only answer health or medical related questions. You can also upload medical-related images and files for analysis.",
+          responseText: ERROR_MESSAGES.NOT_HEALTH_RELATED,
           type: 'blocked',
           reason: guardrail.reason,
           sessionId: request.sessionId || 'temporary',
@@ -65,7 +66,7 @@ export class ChatService {
         currentSessionId = session.id;
       } else if (queryType !== 'general') {
         const session = await prisma.chatSession.findUnique({ where: { id: currentSessionId } });
-        const genericTitles = ['Medical Consultation', 'Hi', 'Hello', 'New Chat'];
+        const genericTitles = AI_CONFIG.GENERIC_TITLES;
 
         if (session && genericTitles.some(gt => session.title?.toLowerCase().includes(gt.toLowerCase()))) {
           const newTitle = await LLMService.generateTitle(request.message);
@@ -107,11 +108,28 @@ export class ChatService {
     }
   }
 
-  public static async getSessions(userId: string) {
-    return prisma.chatSession.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-    });
+  public static async getSessions(userId: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+
+    const [sessions, total] = await Promise.all([
+      prisma.chatSession.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.chatSession.count({ where: { userId } })
+    ]);
+
+    return {
+      sessions,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   public static async getSessionMessages(sessionId: string, userId: string) {

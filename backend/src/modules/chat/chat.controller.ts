@@ -63,11 +63,15 @@ export class ChatController {
         return;
       }
 
-      const sessions = await ChatService.getSessions(user.id);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const sessionsData = await ChatService.getSessions(user.id, page, limit);
 
       res.status(200).json({
         success: true,
-        data: sessions,
+        data: sessionsData.sessions,
+        pagination: sessionsData.pagination,
       });
     } catch (error) {
       handleApiError(error, res, 'ChatController.handleGetSessions');

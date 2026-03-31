@@ -1,25 +1,10 @@
-import { LLMService, LLMProvider } from './llm.service';
-import { FunctionModule } from './function.module';
+import { LLMService } from './llm.service';
+import { FunctionService } from './function.service';
 import { RagService } from './rag.service';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-import { BaseMessage } from '@langchain/core/messages';
-
-export interface RouteRequest {
-    message: string;
-    type: string;
-    provider: LLMProvider;
-    model: string;
-    userId: string;
-    history?: BaseMessage[];
-}
-
-export interface RouteResponse {
-    response: string;
-    type: string;
-    source: string;
-    context?: string;
-}
+import { PROMPTS } from './chat.constants';
+import { RouteRequest, RouteResponse, LLMProvider } from './chat.types';
 
 export class RouterModule {
     /**
@@ -34,10 +19,10 @@ export class RouterModule {
         // 1. Retrieval Logic based on Query Type
         switch (type) {
             case 'symptom':
-                context = await FunctionModule.getSymptomContext(message);
+                context = await FunctionService.getSymptomContext(message);
                 break;
             case 'medicine':
-                context = await FunctionModule.getMedicineContext(message);
+                context = await FunctionService.getMedicineContext(message);
                 break;
             case 'document':
                 context = await ragService.getContext(message, userId);
@@ -48,7 +33,7 @@ export class RouterModule {
 
         // 2. Build LangChain Prompt Template
         const promptTemplate = ChatPromptTemplate.fromMessages([
-            ["system", LLMService.SYSTEM_PROMPT],
+            ["system", PROMPTS.HEALTHCARE_SYSTEM],
             new MessagesPlaceholder("chat_history"),
             ["human", "{input_with_context}"]
         ]);

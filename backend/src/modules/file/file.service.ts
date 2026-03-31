@@ -6,11 +6,11 @@ import mammoth from 'mammoth';
 const officeParser = require('officeparser');
 import Papa from 'papaparse';
 import { RagService } from '../chat/rag.service';
-import { GuardrailService } from '../chat/guardrail';
+import { GuardrailService } from '../chat/guardrail.service';
 import prisma from '../../lib/prisma';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
-import { ERROR_MESSAGES, EXTENSION_TO_TYPE, SUPPORTED_FILE_TYPES, MIMETYPE_TO_TYPE } from '../../utils/constants';
+import { FILE_ERROR_MESSAGES, EXTENSION_TO_TYPE, SUPPORTED_FILE_TYPES, MIMETYPE_TO_TYPE } from './file.constants';
 
 export class FileService {
     private static instance: FileService;
@@ -37,19 +37,26 @@ export class FileService {
             text = await this.extractText(file.path, type);
         } catch (error: any) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error(`${ERROR_MESSAGES.EXTRACTION_FAILED}: ${error.message}`);
+            throw new Error(`${FILE_ERROR_MESSAGES.EXTRACTION_FAILED}: ${error.message}`);
         }
 
         if (!text || text.trim().length < 20) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error(ERROR_MESSAGES.FILE_EMPTY);
+            throw new Error(FILE_ERROR_MESSAGES.FILE_EMPTY);
         }
 
         // 2. Check for Medical Relevance
+        console.log(`[FileService] Checking medical relevance for type: ${type}`);
+        const snippet = text.substring(0, 100).replace(/\n/g, ' ');
+        console.log(`[FileService] Extracted text snippet: "${snippet}..."`);
+
         const relevanceCheck = await GuardrailService.checkMessage(text.substring(0, 2000));
+        console.log(`[FileService] Relevance Check Result:`, relevanceCheck);
+
         if (!relevanceCheck.isAllowed) {
             await fs.unlink(file.path).catch(console.error);
-            throw new Error(`${ERROR_MESSAGES.FILE_NOT_HEALTH_RELATED} ${relevanceCheck.reason || ""}`);
+            console.warn(`[FileService] File rejected: ${relevanceCheck.reason}`);
+            throw new Error(`${FILE_ERROR_MESSAGES.FILE_NOT_HEALTH_RELATED} ${relevanceCheck.reason || ""}`);
         }
 
         // 3. Save file model to DB verified

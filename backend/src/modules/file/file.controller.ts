@@ -1,47 +1,11 @@
 import { Request, Response } from 'express';
 import { FileService } from './file.service';
-import multer from 'multer';
-import path from 'path';
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
-    },
-});
-
-const upload = multer({
-    storage,
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = [
-            'application/pdf',
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel',
-            'text/csv',
-            'text/plain',
-            'text/markdown'
-        ];
-        if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(docx|doc|pptx|ppt|xlsx|xls|csv|txt|md)$/i)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Invalid file type. Supported: PDF, Images, Word, PPT, Excel, CSV, and Text.'));
-        }
-    }
-});
+import { fileUploadMiddleware } from './file.middleware';
 
 const fileService = FileService.getInstance();
 
 export const fileController = {
-    uploadMiddleware: upload.single('file'),
+    uploadMiddleware: fileUploadMiddleware,
 
     async uploadFile(req: Request, res: Response) {
         try {
